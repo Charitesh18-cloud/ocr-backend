@@ -7,14 +7,14 @@ import io
 from pdf2image import convert_from_bytes
 import requests
 import time
-import os
+import os  # ✅ For environment variables
 
 app = FastAPI(title="OCR + DeepTranslate API")
 
 # ---------- CORS Setup ----------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # For development. Tighten for production.
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -42,8 +42,7 @@ async def ocr(file: UploadFile, language: str = Form("eng")):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"OCR processing failed: {str(e)}")
 
-
-# ---------- Translation Endpoint ----------
+# ---------- Translation Classes ----------
 class TranslateRequest(BaseModel):
     text: str
     source_language: str
@@ -54,6 +53,7 @@ class TranslateResponse(BaseModel):
     modelUsed: str
     processing_time: float
 
+# ---------- Translation Logic ----------
 def deep_translate(text, source_lang, target_lang):
     url = "https://deep-translate1.p.rapidapi.com/language/translate/v2"
     payload = {
@@ -63,25 +63,19 @@ def deep_translate(text, source_lang, target_lang):
     }
     headers = {
         "Content-Type": "application/json",
-        "X-RapidAPI-Key": os.getenv("RAPIDAPI_KEY"),
+        "X-RapidAPI-Key": os.getenv("RAPIDAPI_KEY"),  # 🔒 Secret key from environment
         "X-RapidAPI-Host": "deep-translate1.p.rapidapi.com"
     }
 
     response = requests.post(url, json=payload, headers=headers)
 
-    print("🔁 Deep Translate API status:", response.status_code)
-    print("📦 Response body:", response.text)
-
     if response.status_code == 200:
-        try:
-            result = response.json()
-            translated = result["data"]["translations"]["translatedText"]
-            return translated[0] if isinstance(translated, list) else translated
-        except Exception :
-            raise Exception(f"Unexpected response format: {response.text}")
+        result = response.json()["data"]["translations"]["translatedText"]
+        return result[0] if isinstance(result, list) else result
     else:
         raise Exception(f"Translation API error: {response.text}")
 
+# ---------- Translation Endpoint ----------
 @app.post("/translate", response_model=TranslateResponse)
 async def translate_text(request: TranslateRequest):
     try:
@@ -95,14 +89,3 @@ async def translate_text(request: TranslateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# ---------- Run ----------
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000)
-
-
-# ---------- Run ----------
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000)
