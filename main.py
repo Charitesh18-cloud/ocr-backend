@@ -7,7 +7,7 @@ import io
 from pdf2image import convert_from_bytes
 import requests
 import time
-import os  # ⬅️ For environment variables
+import os
 
 app = FastAPI(title="OCR + DeepTranslate API")
 
@@ -63,14 +63,22 @@ def deep_translate(text, source_lang, target_lang):
     }
     headers = {
         "Content-Type": "application/json",
-        "X-RapidAPI-Key": os.getenv("RAPIDAPI_KEY"),  # ⬅️ Key is now hidden!
+        "X-RapidAPI-Key": os.getenv("RAPIDAPI_KEY"),
         "X-RapidAPI-Host": "deep-translate1.p.rapidapi.com"
     }
 
     response = requests.post(url, json=payload, headers=headers)
+
+    print("🔁 Deep Translate API status:", response.status_code)
+    print("📦 Response body:", response.text)
+
     if response.status_code == 200:
-        result = response.json()["data"]["translations"]["translatedText"]
-        return result[0] if isinstance(result, list) else result
+        try:
+            result = response.json()
+            translated = result["data"]["translations"]["translatedText"]
+            return translated[0] if isinstance(translated, list) else translated
+        except Exception :
+            raise Exception(f"Unexpected response format: {response.text}")
     else:
         raise Exception(f"Translation API error: {response.text}")
 
@@ -86,6 +94,12 @@ async def translate_text(request: TranslateRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------- Run ----------
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000)
 
 
 # ---------- Run ----------
